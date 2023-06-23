@@ -13,7 +13,7 @@ import os
 
 quiet = False
 if len(argv) >= 2:
-	if argv[1] == '-q' or argv[1] == '--quiet':
+	if argv[1] in ['-q', '--quiet']:
 		quiet = True
 		print(
 			"Running in quiet mode (HTML and other content hidden); \n"
@@ -158,7 +158,20 @@ PREVIOUS COMMAND: $previous_command
 YOUR COMMAND:
 """
 
-black_listed_elements = set(["html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br", "::marker",])
+black_listed_elements = {
+	"html",
+	"head",
+	"title",
+	"meta",
+	"iframe",
+	"body",
+	"script",
+	"style",
+	"path",
+	"svg",
+	"br",
+	"::marker",
+}
 
 class Crawler:
 	def __init__(self):
@@ -174,7 +187,7 @@ class Crawler:
 		self.page.set_viewport_size({"width": 1280, "height": 1080})
 
 	def go_to_page(self, url):
-		self.page.goto(url=url if "://" in url else "http://" + url)
+		self.page.goto(url=url if "://" in url else f"http://{url}")
 		self.client = self.page.context.new_cdp_session(self.page)
 		self.page_element_buffer = {}
 
@@ -198,11 +211,10 @@ class Crawler:
 		"""
 		self.page.evaluate(js)
 
-		element = self.page_element_buffer.get(int(id))
-		if element:
+		if element := self.page_element_buffer.get(int(id)):
 			x = element.get("center_x")
 			y = element.get("center_y")
-			
+
 			self.page.mouse.click(x, y)
 		else:
 			print("Could not find element")
@@ -228,7 +240,7 @@ class Crawler:
 		win_scroll_x 		= page.evaluate("window.scrollX")
 		win_scroll_y 		= page.evaluate("window.scrollY")
 		win_upper_bound 	= page.evaluate("window.pageYOffset")
-		win_left_bound 		= page.evaluate("window.pageXOffset") 
+		win_left_bound 		= page.evaluate("window.pageXOffset")
 		win_width 			= page.evaluate("window.screen.width")
 		win_height 			= page.evaluate("window.screen.height")
 		win_right_bound 	= win_left_bound + win_width
@@ -297,12 +309,7 @@ class Crawler:
 				return "input"
 			if node_name == "img":
 				return "img"
-			if (
-				node_name == "button" or has_click_handler
-			):  # found pages that needed this quirk
-				return "button"
-			else:
-				return "text"
+			return "button" if (node_name == "button" or has_click_handler) else "text"
 
 		def find_attributes(attributes, keys):
 			values = {}
@@ -324,7 +331,7 @@ class Crawler:
 
 		def add_to_hash_tree(hash_tree, tag, node_id, node_name, parent_id):
 			parent_id_str = str(parent_id)
-			if not parent_id_str in hash_tree:
+			if parent_id_str not in hash_tree:
 				parent_name = strings[node_names[parent_id]].lower()
 				grand_parent_id = parent[parent_id]
 
@@ -417,7 +424,7 @@ class Crawler:
 
 			if node_name == "#text" and ancestor_exception:
 				text = strings[node_value[index]]
-				if text == "|" or text == "•":
+				if text in ["|", "•"]:
 					continue
 				ancestor_node.append({
 					"type": "type", "value": text
@@ -430,7 +437,7 @@ class Crawler:
 					element_attributes.pop(
 						"type", None
 					)  # prevent [button ... (button)..]
-				
+
 				for key in element_attributes:
 					if ancestor_exception:
 						ancestor_node.append({
@@ -458,7 +465,7 @@ class Crawler:
 					element_node_value = strings[text_index]
 
 			# remove redudant elements
-			if ancestor_exception and (node_name != "a" and node_name != "button"):
+			if ancestor_exception and node_name not in ["a", "button"]:
 				continue
 
 			elements_in_view_port.append(
@@ -493,7 +500,7 @@ class Crawler:
 
 			inner_text = f"{node_value} " if node_value else ""
 			meta = ""
-			
+
 			if node_index in child_nodes:
 				for child in child_nodes.get(node_index):
 					entry_type = child.get('type')
